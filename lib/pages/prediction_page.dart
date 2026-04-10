@@ -8,7 +8,7 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
 import '../domain/preprocess_kind.dart';
 import '../domain/resolved_model.dart';
-import '../services/tflite_model_service.dart';
+import '../inference/tflite_model_service.dart';
 import '../widgets/model_selector.dart';
 import 'dart:developer' as developer;
 
@@ -130,7 +130,7 @@ class _PredictionPageState extends State<PredictionPage> {
       _modelStatus = 'Cargando modelo...';
     });
     try {
-      await _modelService.loadModel(assetPath);
+      await _modelService.loadFromAsset(assetPath);
       setState(() {
         final meta = _catalog.firstWhere((m) => m.modelPath == assetPath);
         _modelStatus = 'Modelo cargado: ${meta.displayName}';
