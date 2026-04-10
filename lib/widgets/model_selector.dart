@@ -1,37 +1,51 @@
 import 'package:flutter/material.dart';
 
-class ModelSelector extends StatefulWidget {
-  final List<Map<String, String>> models;
-  final void Function(String) onModelSelected;
-  final String selectedModel;
+import '../domain/resolved_model.dart';
 
+class ModelSelector extends StatelessWidget {
   const ModelSelector({
     super.key,
     required this.models,
-    required this.onModelSelected,
-    required this.selectedModel,
+    required this.selectedSpecId,
+    required this.onSelected,
+    this.enabled = true,
   });
 
-  @override
-  State<ModelSelector> createState() => _ModelSelectorState();
-}
+  final List<ResolvedModel> models;
+  final String? selectedSpecId;
+  final void Function(String specId) onSelected;
+  final bool enabled;
 
-class _ModelSelectorState extends State<ModelSelector> {
   @override
   Widget build(BuildContext context) {
+    if (models.isEmpty) {
+      return const Text('Sin modelos disponibles');
+    }
+    final value = selectedSpecId != null &&
+            models.any((m) => m.specId == selectedSpecId)
+        ? selectedSpecId!
+        : models.first.specId;
+
     return DropdownButton<String>(
-      value: widget.selectedModel,
-      items: widget.models
-          .map((model) => DropdownMenuItem(
-                value: model['asset']!,
-                child: Text(model['name']!),
-              ))
+      value: value,
+      isExpanded: true,
+      items: models
+          .map(
+            (m) => DropdownMenuItem(
+              value: m.specId,
+              enabled: enabled && m.isReady,
+              child: Text(
+                m.displayName,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          )
           .toList(),
-      onChanged: (value) {
-        if (value != null) {
-          widget.onModelSelected(value);
-        }
-      },
+      onChanged: enabled
+          ? (id) {
+              if (id != null) onSelected(id);
+            }
+          : null,
     );
   }
 }

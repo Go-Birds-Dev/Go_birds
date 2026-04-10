@@ -6,7 +6,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
-import '../services/tflite_model_service.dart';
+import '../domain/preprocess_kind.dart';
+import '../domain/resolved_model.dart';
+import '../inference/tflite_model_service.dart';
 import '../widgets/model_selector.dart';
 import 'dart:developer' as developer;
 
@@ -44,7 +46,38 @@ class _PredictionPageState extends State<PredictionPage> {
     'Thraupis palmarum': 'Tángara de Palmeras',
   };
   final TFLiteModelService _modelService = TFLiteModelService();
-  String _selectedModel = 'assets/models/vgg16_aves.tflite';
+  static final List<ResolvedModel> _catalog = [
+    ResolvedModel(
+      specId: 'vgg16',
+      displayName: 'VGG16',
+      preprocessKind: PreprocessKind.vgg16MeanBGR,
+      modelPath: 'assets/models/vgg16_aves.tflite',
+      labelsPath: 'assets/classes.txt',
+      usesBundledModel: true,
+      usesBundledLabels: true,
+    ),
+    ResolvedModel(
+      specId: 'mobilenet_v2',
+      displayName: 'MobileNetV2',
+      preprocessKind: PreprocessKind.mobilenet255,
+      modelPath: 'assets/models/mobilenet_v2_aves.tflite',
+      labelsPath: 'assets/classes.txt',
+      usesBundledModel: true,
+      usesBundledLabels: true,
+    ),
+    ResolvedModel(
+      specId: 'densenet',
+      displayName: 'DenseNet',
+      preprocessKind: PreprocessKind.mobilenet255,
+      modelPath: 'assets/models/modelo_final_densenet.tflite',
+      labelsPath: 'assets/classes_densenet.txt',
+      usesBundledModel: true,
+      usesBundledLabels: true,
+    ),
+  ];
+
+  String _selectedModel = _catalog.first.modelPath;
+  String _selectedSpecId = _catalog.first.specId;
   bool _loading = false;
   String? _modelStatus;
   File? _selectedImageFile;
@@ -52,23 +85,6 @@ class _PredictionPageState extends State<PredictionPage> {
   List<double>? _prediction;
   String? _predictionLabel;
   String? _topSpeciesName; // Nombre científico de la especie predicha
-  final List<Map<String, String>> _models = [
-    {
-      'name': 'VGG16',
-      'asset': 'assets/models/vgg16_aves.tflite',
-      'classes': 'assets/classes.txt',
-    },
-    {
-      'name': 'MobileNetV2',
-      'asset': 'assets/models/mobilenet_v2_aves.tflite',
-      'classes': 'assets/classes.txt',
-    },
-    {
-      'name': 'DenseNet',
-      'asset': 'assets/models/modelo_final_densenet.tflite',
-      'classes': 'assets/classes_densenet.txt',
-    },
-  ];
 
   @override
   void initState() {
@@ -79,12 +95,11 @@ class _PredictionPageState extends State<PredictionPage> {
 
   Future<void> _loadClassNames() async {
     try {
-      // Encontrar el modelo seleccionado para obtener su archivo de clases
-      final model = _models.firstWhere(
-        (m) => m['asset'] == _selectedModel,
-        orElse: () => _models[0],
+      final model = _catalog.firstWhere(
+        (m) => m.modelPath == _selectedModel,
+        orElse: () => _catalog.first,
       );
-      final classesFile = model['classes'] ?? 'assets/classes.txt';
+      final classesFile = model.labelsPath;
       
       final content = await rootBundle.loadString(classesFile);
       final lines = content
@@ -115,10 +130,12 @@ class _PredictionPageState extends State<PredictionPage> {
       _modelStatus = 'Cargando modelo...';
     });
     try {
-      await _modelService.loadModel(assetPath);
+      await _modelService.loadFromAsset(assetPath);
       setState(() {
-        _modelStatus = 'Modelo cargado: ${_models.firstWhere((m) => m['asset'] == assetPath)['name']}';
+        final meta = _catalog.firstWhere((m) => m.modelPath == assetPath);
+        _modelStatus = 'Modelo cargado: ${meta.displayName}';
         _selectedModel = assetPath;
+        _selectedSpecId = meta.specId;
       });
       // Cargar las clases correspondientes al nuevo modelo
       await _loadClassNames();
@@ -363,10 +380,11 @@ class _PredictionPageState extends State<PredictionPage> {
                 ),
                 const SizedBox(height: 24),
                 ModelSelector(
-                  models: _models,
-                  selectedModel: _selectedModel,
-                  onModelSelected: (modelAsset) {
-                    _loadModel(modelAsset);
+                  models: _catalog,
+                  selectedSpecId: _selectedSpecId,
+                  onSelected: (specId) {
+                    final m = _catalog.firstWhere((x) => x.specId == specId);
+                    _loadModel(m.modelPath);
                   },
                 ),
                 const SizedBox(height: 24),
